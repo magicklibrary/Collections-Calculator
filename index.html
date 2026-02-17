@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Late Payment Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy: #0a1628;
+    --navy-mid: #122040;
+    --navy-light: #1a2f55;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --gold-pale: #f5e9c8;
+    --cream: #faf7f0;
+    --white: #ffffff;
+    --red: #c0392b;
+    --green: #1a6b4a;
+    --gray: #8a9ab5;
+    --border: rgba(201,168,76,0.25);
+    --shadow: 0 8px 40px rgba(10,22,40,0.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--navy);
+    min-height: 100vh;
+    color: var(--cream);
+    background-image:
+      radial-gradient(ellipse at 0% 0%, rgba(201,168,76,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 100% 100%, rgba(26,47,85,0.8) 0%, transparent 50%);
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, var(--navy-mid) 0%, var(--navy) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-icon {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 4px 16px rgba(201,168,76,0.35);
+  }
+  .header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: -0.3px;
+  }
+  .header-sub {
+    font-size: 13px;
+    color: var(--gray);
+    margin-top: 2px;
+    letter-spacing: 0.3px;
+  }
+  .btn-export {
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+    color: var(--navy);
+    border: none;
+    padding: 12px 26px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(201,168,76,0.3);
+    letter-spacing: 0.2px;
+  }
+  .btn-export:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(201,168,76,0.45);
+  }
+  .btn-export:active { transform: translateY(0); }
+
+  /* RULES PANEL */
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  .rules-panel {
+    background: rgba(201,168,76,0.07);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 28px;
+    margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .rule-item { display: flex; align-items: flex-start; gap: 10px; }
+  .rule-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--gold);
+    margin-top: 6px; flex-shrink: 0;
+  }
+  .rule-text { font-size: 13px; color: var(--gold-pale); line-height: 1.5; }
+  .rule-text strong { color: var(--gold-light); font-weight: 600; }
+
+  /* INVOICE CARD */
+  .invoice-card {
+    background: linear-gradient(160deg, var(--navy-mid) 0%, rgba(26,47,85,0.5) 100%);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    animation: slideIn 0.3s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .invoice-card:hover { border-color: rgba(201,168,76,0.4); }
+
+  .card-header {
+    background: linear-gradient(90deg, rgba(201,168,76,0.12) 0%, transparent 100%);
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header-left { display: flex; align-items: center; gap: 12px; }
+  .invoice-num-badge {
+    background: var(--gold);
+    color: var(--navy);
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+  }
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    color: var(--white);
+  }
+  .btn-remove {
+    background: rgba(192,57,43,0.15);
+    border: 1px solid rgba(192,57,43,0.3);
+    color: #e87a6d;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-remove:hover { background: rgba(192,57,43,0.3); }
+
+  .card-body { padding: 24px; }
+
+  .fields-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  .field-group { display: flex; flex-direction: column; gap: 7px; }
+  .field-group label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray);
+  }
+  .field-group input,
+  .field-group select {
+    background: rgba(10,22,40,0.6);
+    border: 1px solid rgba(138,154,181,0.25);
+    border-radius: 9px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 11px 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+    outline: none;
+  }
+  .field-group input::placeholder { color: rgba(138,154,181,0.5); }
+  .field-group input:focus,
+  .field-group select:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+  }
+  .field-group select { cursor: pointer; }
+  .field-group select option { background: var(--navy-mid); }
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6) sepia(1) saturate(3) hue-rotate(5deg); cursor: pointer; }
+
+  /* RESULTS ROW */
+  .results-row {
+    background: rgba(10,22,40,0.5);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 16px;
+  }
+  .result-item { text-align: center; }
+  .result-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray);
+    margin-bottom: 6px;
+  }
+  .result-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--white);
+  }
+  .result-value.gold { color: var(--gold-light); }
+  .result-value.red { color: #e87a6d; }
+  .result-value.green { color: #5ecba1; }
+  .result-value.highlight {
+    font-size: 20px;
+    color: var(--gold);
+    font-weight: 500;
+  }
+  .result-divider {
+    width: 1px;
+    background: rgba(201,168,76,0.15);
+    align-self: stretch;
+  }
+  .fee-active {
+    display: inline-block;
+    background: rgba(231,76,60,0.15);
+    border: 1px solid rgba(231,76,60,0.3);
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: 10px;
+    color: #e87a6d;
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .fee-inactive {
+    display: inline-block;
+    font-size: 10px;
+    color: rgba(138,154,181,0.4);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ADD BUTTON */
+  .btn-add {
+    width: 100%;
+    background: transparent;
+    border: 2px dashed rgba(201,168,76,0.3);
+    border-radius: 14px;
+    padding: 18px;
+    color: var(--gold);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 8px;
+  }
+  .btn-add:hover {
+    background: rgba(201,168,76,0.06);
+    border-color: var(--gold);
+    transform: none;
+  }
+
+  /* SUMMARY BAR */
+  .summary-bar {
+    background: linear-gradient(135deg, var(--navy-mid), var(--navy-light));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 32px;
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-bar::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+  }
+  .summary-item { text-align: center; }
+  .summary-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--gray);
+    margin-bottom: 8px;
+  }
+  .summary-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--gold-light);
+  }
+  .summary-value.total {
+    font-size: 28px;
+    color: var(--gold);
+    text-shadow: 0 0 20px rgba(201,168,76,0.3);
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .header { padding: 16px 20px; flex-wrap: wrap; gap: 12px; }
+    .fields-grid { grid-template-columns: 1fr 1fr; }
+    .container { padding: 20px 16px 40px; }
+  }
+  @media (max-width: 520px) {
+    .fields-grid { grid-template-columns: 1fr; }
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    background: var(--gold);
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 14px 22px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: none;
+    align-items: center;
+    gap: 8px;
+    z-index: 999;
+    animation: toastIn 0.3s ease-out;
+  }
+  @keyframes toastIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .toast.show { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">$</div>
+    <div>
+      <div class="header-title">Late Payment Calculator</div>
+      <div class="header-sub">Compounded interest · Late fees · Collections · Excel export</div>
+    </div>
+  </div>
+  <button class="btn-export" onclick="exportToExcel()">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17v2a2 2 0 002 2h16a2 2 0 002-2v-2"/></svg>
+    Export to Excel
+  </button>
+</div>
+
+<div class="container">
+  <div class="rules-panel">
+    <div class="rule-item"><div class="rule-dot"></div><div class="rule-text"><strong>Interest:</strong> 1.5%/month (18% annually), compounded monthly<br><span style="font-family:'DM Mono',monospace;font-size:11px;opacity:0.8">Principal × (1.015)^(Days÷30) − Principal</span></div></div>
+    <div class="rule-item"><div class="rule-dot"></div><div class="rule-text"><strong>Late Fee:</strong> $75.00 one-time charge when Days Delinquent &gt; 45</div></div>
+    <div class="rule-item"><div class="rule-dot"></div><div class="rule-text"><strong>Collections Fee:</strong> 15% one-time on outstanding balance</div></div>
+    <div class="rule-item"><div class="rule-dot"></div><div class="rule-text"><strong>Admin Fee:</strong> 5% of Collections Fee (added on top)</div></div>
+  </div>
+
+  <div id="invoices-container"></div>
+
+  <button class="btn-add" onclick="addInvoice()">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Add Another Invoice
+  </button>
+
+  <div class="summary-bar" id="summary-bar">
+    <div class="summary-item">
+      <div class="summary-label">Total Principal</div>
+      <div class="summary-value" id="sum-principal">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Total Interest</div>
+      <div class="summary-value" id="sum-interest">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Total Late Fees</div>
+      <div class="summary-value" id="sum-late">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Total Collections</div>
+      <div class="summary-value" id="sum-collections">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Total Admin Fee</div>
+      <div class="summary-value" id="sum-admin">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <div class="summary-label">Grand Total Due</div>
+      <div class="summary-value total" id="sum-total">$0.00</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ Excel file exported successfully</div>
+
+<script>
+let invoiceCount = 0;
+
+function fmt(n) {
+  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function calcInvoice(data) {
+  const principal = parseFloat(data.amount) || 0;
+  const days = parseFloat(data.days) || 0;
+  const interest = principal > 0 && days > 0
+    ? principal * Math.pow(1.015, days / 30) - principal
+    : 0;
+  const lateFee = days > 45 ? 75 : 0;
+  const subtotal = principal + interest + lateFee;
+  const collectionsFee = subtotal * 0.15;
+  const adminFee = collectionsFee * 0.05;
+  const totalDue = subtotal + collectionsFee + adminFee;
+  return { principal, days, interest, lateFee, subtotal, collectionsFee, adminFee, totalDue };
+}
+
+function updateCard(id) {
+  const card = document.getElementById('card-' + id);
+  const getData = (field) => card.querySelector('[data-field="' + field + '"]').value;
+
+  const data = {
+    amount: getData('amount'),
+    days: getData('days'),
+  };
+  const r = calcInvoice(data);
+
+  card.querySelector('[data-result="interest"]').textContent = fmt(r.interest);
+  card.querySelector('[data-result="latefee"]').textContent = r.lateFee > 0 ? fmt(r.lateFee) : '$0.00';
+  card.querySelector('[data-result="latefee-badge"]').className = r.lateFee > 0 ? 'fee-active' : 'fee-inactive';
+  card.querySelector('[data-result="latefee-badge"]').textContent = r.lateFee > 0 ? '⚠ Applied' : 'Not triggered';
+  card.querySelector('[data-result="collections"]').textContent = fmt(r.collectionsFee);
+  card.querySelector('[data-result="admin"]').textContent = fmt(r.adminFee);
+  card.querySelector('[data-result="subtotal"]').textContent = fmt(r.subtotal);
+  card.querySelector('[data-result="total"]').textContent = fmt(r.totalDue);
+
+  updateSummary();
+}
+
+function syncClientName(id) {
+  const card = document.getElementById('card-' + id);
+  const name = card.querySelector('[data-field="client"]').value;
+  document.querySelectorAll('[data-field="client"]').forEach(el => {
+    if (el.closest('.invoice-card').id !== 'card-' + id) {
+      el.value = name;
+    }
+  });
+}
+
+function updateSummary() {
+  let totals = { principal: 0, interest: 0, late: 0, collections: 0, admin: 0, total: 0 };
+  document.querySelectorAll('.invoice-card').forEach(card => {
+    const id = card.dataset.invoiceid;
+    const amount = parseFloat(card.querySelector('[data-field="amount"]').value) || 0;
+    const days = parseFloat(card.querySelector('[data-field="days"]').value) || 0;
+    const r = calcInvoice({ amount, days });
+    totals.principal += r.principal;
+    totals.interest += r.interest;
+    totals.late += r.lateFee;
+    totals.collections += r.collectionsFee;
+    totals.admin += r.adminFee;
+    totals.total += r.totalDue;
+  });
+  document.getElementById('sum-principal').textContent = fmt(totals.principal);
+  document.getElementById('sum-interest').textContent = fmt(totals.interest);
+  document.getElementById('sum-late').textContent = fmt(totals.late);
+  document.getElementById('sum-collections').textContent = fmt(totals.collections);
+  document.getElementById('sum-admin').textContent = fmt(totals.admin);
+  document.getElementById('sum-total').textContent = fmt(totals.total);
+}
+
+function addInvoice() {
+  invoiceCount++;
+  const id = invoiceCount;
+  const today = new Date().toISOString().split('T')[0];
+
+  // Carry forward client name if any exist
+  let existingClient = '';
+  const existingClients = document.querySelectorAll('[data-field="client"]');
+  if (existingClients.length > 0) existingClient = existingClients[0].value;
+
+  const html = `
+  <div class="invoice-card" id="card-${id}" data-invoiceid="${id}">
+    <div class="card-header">
+      <div class="card-header-left">
+        <span class="invoice-num-badge">INV #${id}</span>
+        <span class="card-title" id="card-title-${id}">New Invoice</span>
+      </div>
+      ${id > 1 ? `<button class="btn-remove" onclick="removeInvoice(${id})">✕ Remove</button>` : ''}
+    </div>
+    <div class="card-body">
+      <div class="fields-grid">
+        <div class="field-group">
+          <label>Client Name</label>
+          <input type="text" data-field="client" placeholder="ABC Company" value="${existingClient}"
+            oninput="syncClientName(${id}); updateCardTitle(${id})">
+        </div>
+        <div class="field-group">
+          <label>Invoice Number</label>
+          <input type="text" data-field="invnum" placeholder="INV-00${id}"
+            oninput="updateCardTitle(${id})">
+        </div>
+        <div class="field-group">
+          <label>Invoice Date</label>
+          <input type="date" data-field="invdate" value="${today}">
+        </div>
+        <div class="field-group">
+          <label>Payment Terms</label>
+          <select data-field="terms">
+            <option value="0">Net 0 (Due on Receipt)</option>
+            <option value="10">Net 10</option>
+            <option value="14">Net 14</option>
+            <option value="30" selected>Net 30</option>
+            <option value="45">Net 45</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Invoice Amount ($)</label>
+          <input type="number" data-field="amount" placeholder="1,000.00" min="0" step="0.01"
+            oninput="updateCard(${id})">
+        </div>
+        <div class="field-group">
+          <label>Days Delinquent</label>
+          <input type="number" data-field="days" placeholder="0" min="0" step="1"
+            oninput="updateCard(${id})">
+        </div>
+      </div>
+
+      <div class="results-row">
+        <div class="result-item">
+          <div class="result-label">Accrued Interest</div>
+          <div class="result-value gold" data-result="interest">$0.00</div>
+        </div>
+        <div class="result-divider"></div>
+        <div class="result-item">
+          <div class="result-label">Late Fee ($75)</div>
+          <div class="result-value red" data-result="latefee">$0.00</div>
+          <div class="fee-inactive" data-result="latefee-badge">Not triggered</div>
+        </div>
+        <div class="result-divider"></div>
+        <div class="result-item">
+          <div class="result-label">Subtotal</div>
+          <div class="result-value" data-result="subtotal">$0.00</div>
+        </div>
+        <div class="result-divider"></div>
+        <div class="result-item">
+          <div class="result-label">Collections (15%)</div>
+          <div class="result-value red" data-result="collections">$0.00</div>
+        </div>
+        <div class="result-divider"></div>
+        <div class="result-item">
+          <div class="result-label">Admin Fee (5% of Coll.)</div>
+          <div class="result-value red" data-result="admin">$0.00</div>
+        </div>
+        <div class="result-divider"></div>
+        <div class="result-item">
+          <div class="result-label">Total Due</div>
+          <div class="result-value highlight" data-result="total">$0.00</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('invoices-container').insertAdjacentHTML('beforeend', html);
+  updateSummary();
+}
+
+function updateCardTitle(id) {
+  const card = document.getElementById('card-' + id);
+  const client = card.querySelector('[data-field="client"]').value;
+  const invnum = card.querySelector('[data-field="invnum"]').value;
+  const titleEl = document.getElementById('card-title-' + id);
+  if (client || invnum) {
+    titleEl.textContent = [client, invnum].filter(Boolean).join(' · ');
+  } else {
+    titleEl.textContent = 'New Invoice';
+  }
+}
+
+function removeInvoice(id) {
+  document.getElementById('card-' + id).remove();
+  updateSummary();
+}
+
+function exportToExcel() {
+  const invoiceCards = document.querySelectorAll('.invoice-card');
+  if (invoiceCards.length === 0) { alert('No invoices to export.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Detail sheet data
+  const detailRows = [];
+  detailRows.push([
+    'Invoice #', 'Client Name', 'Invoice Number', 'Invoice Date', 'Payment Terms',
+    'Invoice Amount', 'Days Delinquent', 'Accrued Interest', 'Late Fee ($75)',
+    'Subtotal (Principal+Interest+LateFee)', 'Collections Fee (15%)',
+    'Admin Fee (5% of Collections)', 'TOTAL DUE'
+  ]);
+
+  let totals = { principal: 0, interest: 0, late: 0, subtotal: 0, collections: 0, admin: 0, total: 0 };
+  let rowNum = 1;
+
+  invoiceCards.forEach((card) => {
+    const g = (f) => card.querySelector('[data-field="' + f + '"]').value;
+    const amount = parseFloat(g('amount')) || 0;
+    const days = parseFloat(g('days')) || 0;
+    const r = calcInvoice({ amount, days });
+    const terms = card.querySelector('[data-field="terms"]') ? card.querySelector('[data-field="terms"] option:checked').text : 'Net 30';
+
+    detailRows.push([
+      rowNum++,
+      g('client'),
+      g('invnum'),
+      g('invdate'),
+      terms,
+      amount,
+      days,
+      parseFloat(r.interest.toFixed(2)),
+      r.lateFee,
+      parseFloat(r.subtotal.toFixed(2)),
+      parseFloat(r.collectionsFee.toFixed(2)),
+      parseFloat(r.adminFee.toFixed(2)),
+      parseFloat(r.totalDue.toFixed(2)),
+    ]);
+
+    totals.principal += r.principal;
+    totals.interest += r.interest;
+    totals.late += r.lateFee;
+    totals.subtotal += r.subtotal;
+    totals.collections += r.collectionsFee;
+    totals.admin += r.adminFee;
+    totals.total += r.totalDue;
+  });
+
+  // Totals row
+  detailRows.push([]);
+  detailRows.push([
+    'TOTALS', '', '', '', '',
+    parseFloat(totals.principal.toFixed(2)),
+    '',
+    parseFloat(totals.interest.toFixed(2)),
+    parseFloat(totals.late.toFixed(2)),
+    parseFloat(totals.subtotal.toFixed(2)),
+    parseFloat(totals.collections.toFixed(2)),
+    parseFloat(totals.admin.toFixed(2)),
+    parseFloat(totals.total.toFixed(2))
+  ]);
+
+  // Notes rows
+  detailRows.push([]);
+  detailRows.push(['CALCULATION NOTES']);
+  detailRows.push(['Interest Formula', 'Principal × (1.015)^(Days Delinquent ÷ 30) − Principal']);
+  detailRows.push(['Interest Rate', '1.5% per month / 18% annually, compounded monthly']);
+  detailRows.push(['Late Fee', '$75.00 one-time charge applied when Days Delinquent > 45']);
+  detailRows.push(['Collections Fee', '15% of (Principal + Accrued Interest + Late Fee)']);
+  detailRows.push(['Admin Fee', '5% of Collections Fee']);
+  detailRows.push(['Generated', new Date().toLocaleString()]);
+
+  const ws = XLSX.utils.aoa_to_sheet(detailRows);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:10},{wch:22},{wch:16},{wch:14},{wch:18},
+    {wch:16},{wch:16},{wch:18},{wch:14},
+    {wch:30},{wch:22},{wch:26},{wch:16}
+  ];
+
+  // Style header row (bold)
+  const headerRange = XLSX.utils.decode_range(ws['!ref']);
+  const header = detailRows[0];
+  header.forEach((_, ci) => {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c: ci });
+    if (!ws[cellRef]) ws[cellRef] = { v: '' };
+    ws[cellRef].s = {
+      font: { bold: true, color: { rgb: '0A1628' } },
+      fill: { fgColor: { rgb: 'C9A84C' } },
+      alignment: { horizontal: 'center', wrapText: true }
+    };
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Invoice Detail');
+
+  // Summary sheet
+  const summaryRows = [
+    ['LATE PAYMENT SUMMARY REPORT'],
+    ['Generated:', new Date().toLocaleString()],
+    [],
+    ['Category', 'Amount'],
+    ['Total Invoice Principal', parseFloat(totals.principal.toFixed(2))],
+    ['Total Accrued Interest', parseFloat(totals.interest.toFixed(2))],
+    ['Total Late Fees', parseFloat(totals.late.toFixed(2))],
+    ['Total Collections Fees (15%)', parseFloat(totals.collections.toFixed(2))],
+    ['Total Admin Fees (5%)', parseFloat(totals.admin.toFixed(2))],
+    ['GRAND TOTAL DUE', parseFloat(totals.total.toFixed(2))],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
+  ws2['!cols'] = [{wch:34},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  const dateStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `Late_Payment_Report_${dateStr}.xlsx`);
+
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Initialize with first invoice
+addInvoice();
+</script>
+</body>
+</html>
